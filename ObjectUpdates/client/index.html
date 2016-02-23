@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        "use strict";
+    
+        var canvas;
+        var ctx;
+        //our websocket connection
+        var socket; 
+
+        var user = 'user' + (Math.floor((Math.random()*1000)) + 1);
+		var draws = {};
+		function draw()
+		{
+			ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+			var keys = Object.keys(draws);
+
+			for(var i = 0; i < keys.length; i++)
+			{
+				var drawCall = draws[ keys[i] ];
+				ctx.fillRect(drawCall.x, drawCall.y, drawCall.width, drawCall.height);
+			}
+		}
+
+        
+        function setup()
+		{
+			var time = new Date().getTime();
+			var x = Math.floor(Math.random()*(300-10)+10); //random x position
+			var y = Math.floor(Math.random()*(300-10)+10); //random y position
+			draws[user] = {lastUpdate: time, x: x, y: y, width: 100, height: 100};
+		}
+		function handleMessage(data)
+		{
+			if( !draws[data.name] )
+			{
+				draws[data.name] = data.coords;
+			}
+			else if( data.coords.lastUpdate > draws[data.name].lastUpdate )
+			{
+				draws[data.name] = data.coords;
+			}
+			draw(); //redraw after updates
+		}
+        function init() {
+            canvas = document.querySelector("#canvas");
+            ctx = canvas.getContext("2d");
+        
+            //Connect to our server (io added automatically by socket.io when embedding it in the HTTP app on the server side)
+            //This will return a new websocket connection. Every call to io.connect will return a new websocket connection 
+            //BUT not necessarily close the existing one. 
+            //You can absolutely use multiple websockets on the client, but you have to manage which ones are listening to which
+            //messages. In cases like this, you only need one. 
+            socket = io.connect();
+            
+            //When the socket connects successfully
+            socket.on('connect', function () {
+				setup();
+                setInterval(function ()
+				{
+					var time = new Date().getTime();
+
+					draws[user].lastUpdate = time;
+					draws[user].x += 5;
+					socket.emit('draw', { name: user, coords: draws[user] });
+					draw();
+				}, 3000);
+            });      
+            
+            
+            socket.on('drawObjects', handleMessage);
+        }
+
+      window.onload = init;
+    </script>
+</head>
+<body>
+    <canvas id="canvas" height="500" width="500">Please use an HTML 5 browser</canvas>
+</body>
+</html>
